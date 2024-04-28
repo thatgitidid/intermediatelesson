@@ -4,136 +4,102 @@ using IntermediateLessons.Data;
 using Microsoft.Data.SqlClient;
 using System.Data;
 using Microsoft.Extensions.Configuration;
+using System.Text.Json;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
 
 // Top level statements go top.
 // This could be below the class if intenal class Program {static void Main(string[] args)
 // was in page.
 
-
-//////////Moved to data
-// String contains info for creating connection.
-//string connectionString =
-//    "Server=localhost;Database=DotNetCourseDatabase;TrustServerCertificate=true;Trusted_Connection=true;";
-
-//// IDbConnection object is used to connect, uses info from the connectString to create the SqlConnection.
-//// Now dbConnection has access to query the database.
-//IDbConnection dbConnection = new SqlConnection(connectionString);
-
-//// Testing sql connection with this query.
-//string sqlCommand = "SELECT GETDATE()";
-/////////Moved to data
-
-// Running the query with Dapper.
-
-
-//Requires the ConnectionStrings key in the Json file.
 IConfiguration config = new ConfigurationBuilder()
     .AddJsonFile("appsettings.json")
     .Build();
 
 DataContextDapper dapper = new DataContextDapper(config);
-DataContextEF entityFramework = new DataContextEF(config);
-
-DateTime rightNow = dapper.LoadDataSingle<DateTime>("SELECT GETDATE()");
-
-// Writing the result to console to confirm.  Query does not auto pop it out even if not set
-// to a variable.
-//Console.WriteLine(rightNow);
-
-
-Computer myComputer = new Computer()
-{
-    Motherboard = "Z690",
-    HasWifi = true,
-    HasLTE = false,
-    ReleaseDate = DateTime.Now,
-    Price = 943.87m,
-    VideoCard = "RTX 2060"
-};
-
-// Entity framework version of adding the myComputer to table.
-entityFramework.Add(myComputer);
-entityFramework.SaveChanges();
 
 // Constructing SQL query.  Would it be better to use parameterized queries?
-string sql = @"INSERT INTO TutorialAppSchema.Computer (
-    Motherboard,
-    HasWifi,
-    HasLTE,
-    ReleaseDate,
-    Price,
-    VideoCard
-) VALUES ('"+ myComputer.Motherboard
-    + "','" + myComputer.HasWifi
-    + "','" + myComputer.HasLTE
-    + "','" + myComputer.ReleaseDate
-    + "','" + myComputer.Price
-    + "','" + myComputer.VideoCard
-+ "')";
+//string sql = @"INSERT INTO TutorialAppSchema.Computer (
+//    Motherboard,
+//    HasWifi,
+//    HasLTE,
+//    ReleaseDate,
+//    Price,
+//    VideoCard
+//) VALUES ('"+ myComputer.Motherboard
+//    + "','" + myComputer.HasWifi
+//    + "','" + myComputer.HasLTE
+//    + "','" + myComputer.ReleaseDate
+//    + "','" + myComputer.Price
+//    + "','" + myComputer.VideoCard
+//+ "')\n";
 
-//Console.WriteLine(sql);
+//File.WriteAllText("log.txt", "\n" + sql + "\n");
 
-//int result = dapper.ExecuteSqlWithRowCount(sql);
-bool result = dapper.ExecuteSql(sql);
+//using StreamWriter openFile = new("log.txt", append: true);
 
-//Console.WriteLine(result);
+//openFile.WriteLine("\n" + sql + "\n");
 
-string sqlSelect = @"
-SELECT 
-    Computer.Motherboard,
-    Computer.HasWifi,
-    Computer.HasLTE,
-    Computer.ReleaseDate,
-    Computer.Price,
-    Computer.VideoCard 
-FROM TutorialAppSchema.computer";
+//openFile.Close();
 
-// Create IEnumerable of computers.  When sqlSelect is called, it will return
-// an IEnumerable.  Would need to do List and ToList() if wanted a list.
-IEnumerable<Computer> computers = dapper.LoadData<Computer>(sqlSelect);
+string computersPath = "C:\\Users\\antho\\source\\repos\\IntermediateLessons\\IntermediateLessons\\Computers.json";
 
-// Something is wrong and this loops the 0 id entry.
-Console.WriteLine("'ComputerId','Motherboard','HasWifi','HasLTE','ReleaseDate','Price','VideoCard'");
-// Does not have to show this view, just copy pasted to validate working in console.
-foreach (Computer singleComputer in computers)
+string computersJson = File.ReadAllText(computersPath);
+
+//Console.WriteLine(computersJson);
+
+// system.Text.Json options ########################################################
+JsonSerializerOptions options = new JsonSerializerOptions()
 {
-    Console.WriteLine("'" + singleComputer.ComputerId
-    + "','" + singleComputer.Motherboard
-    + "','" + singleComputer.HasWifi
-    + "','" + singleComputer.HasLTE
-    + "','" + singleComputer.ReleaseDate
-    + "','" + singleComputer.Price
-    + "','" + singleComputer.VideoCard
-+ "'");
-}
+    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+};
 
+IEnumerable<Computer>? computersSystem = System.Text.Json.JsonSerializer.Deserialize<IEnumerable<Computer>>(computersJson, options);
 
-// Entity Framework To List Call
-// Does same as the dapper.
-IEnumerable<Computer>? computersEF = entityFramework.Computer?.ToList<Computer>();
+IEnumerable<Computer>? computersNewtonSoft = JsonConvert.DeserializeObject<IEnumerable<Computer>>(computersJson);
 
-if (computersEF != null)
+if (computersNewtonSoft != null)
 {
-    Console.WriteLine("'ComputerId','Motherboard','HasWifi','HasLTE','ReleaseDate','Price','VideoCard'");
-    // Does not have to show this view, just copy pasted to validate working in console.
-    foreach (Computer singleComputer in computersEF)
+    foreach (Computer computer in computersNewtonSoft)
     {
-        Console.WriteLine("'" + singleComputer.ComputerId
-        + "','" + singleComputer.Motherboard
-        + "','" + singleComputer.HasWifi
-        + "','" + singleComputer.HasLTE
-        + "','" + singleComputer.ReleaseDate
-        + "','" + singleComputer.Price
-        + "','" + singleComputer.VideoCard
-    + "'");
+        //Console.WriteLine(computer.Motherboard);
+        string sql = @"INSERT INTO TutorialAppSchema.Computer (
+            Motherboard,
+            HasWifi,
+            HasLTE,
+            ReleaseDate,
+            Price,
+            VideoCard
+        ) VALUES ('" + EscapeSingleQuote(computer.Motherboard)
+            + "','" + computer.HasWifi
+            + "','" + computer.HasLTE
+            + "','" + computer.ReleaseDate
+            + "','" + computer.Price
+            + "','" + EscapeSingleQuote(computer.VideoCard)
+        + "')\n";
+
+        dapper.ExecuteSql(sql);
     }
 }
 
-//myComputer.HasWifi = false;
-//Console.WriteLine(myComputer.Motherboard);
-//Console.WriteLine(myComputer.HasWifi);
-//Console.WriteLine(myComputer.ReleaseDate);
-//Console.WriteLine(myComputer.VideoCard);
+// Newtonsoft settings ########################################################
+JsonSerializerSettings settings = new JsonSerializerSettings()
+{
+    ContractResolver = new CamelCasePropertyNamesContractResolver()
+};
 
+string computersCopyNewtonsoft = JsonConvert.SerializeObject(computersNewtonSoft, settings);
+string newtonPath = "C:\\Users\\antho\\source\\repos\\IntermediateLessons\\IntermediateLessons\\computersCopyNewtonsoft.txt";
+File.WriteAllText(newtonPath, computersCopyNewtonsoft);
 
+string computersCopySystem = System.Text.Json.JsonSerializer.Serialize(computersSystem, options);
+string systemPath = "C:\\Users\\antho\\source\\repos\\IntermediateLessons\\IntermediateLessons\\computersCopySystem.txt";
+File.WriteAllText(systemPath, computersCopySystem);
 
+// SQL cannot have single quotes in it.  This method will escape them.
+static string EscapeSingleQuote(string input)
+{
+    string output = input.Replace("'", "''");
+
+    return output;
+}
